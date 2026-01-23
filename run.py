@@ -3,9 +3,9 @@ import numpy as np
 import pandas as pd
 
 from helper import rho_matrix_construct
-from sim import sim_dW, sim_sigma, sim_eta, sim_mu, sim_revenue
+from sim import *
 
-def run_sim(params, n_steps, n_paths, T, seed=99, return_all = False):
+def run_sim(params, n_steps, n_paths, T, alpha, entry_mult, seed=99, stochastic_ir = False, return_all = False):
     # --- read scalar params
     dt = T / n_steps
 
@@ -21,7 +21,7 @@ def run_sim(params, n_steps, n_paths, T, seed=99, return_all = False):
     dW = sim_dW(n_paths=n_paths, n_steps=n_steps, dt=dt, corr=corr, seed=seed)
     dW_R = dW[:, :, 0]
     dW_mu = dW[:, :, 1]
-    # dW_r = dW[:, :, 2]  # rfor interest rates
+    dW_r = dW[:, :, 2]  # rfor interest rates
 
     # --- deterministic sigma and eta (tiled to paths)
     sigmas = sim_sigma(
@@ -62,19 +62,59 @@ def run_sim(params, n_steps, n_paths, T, seed=99, return_all = False):
         dW_R=dW_R,
     )
 
+    #costs
+
+    C, Y = sim_PL(
+        R=R,
+        F=float(params["F_0"]),
+        theta=float(params["theta"])
+    )
+
+    # interest rates
+
+    if stochastic_ir:
+        r = sim_cir(
+            n_steps=n_steps, 
+            dt=dt, 
+            r0=params['r0'], 
+            xi=params['xi'], 
+            theta_r=params['theta_r'], 
+            omega=params['omega'], 
+            dW_r=dW_r)
+    else:
+        r = 0.06
+
+
+    #LBO
+
+    EBITDA_0 = params['R_0'] * (1 - params['theta']) - params['F_0']
+    D, I, P, defaulted, eq_cf = sim_LBO(
+    Y=Y,
+    V0=EBITDA_0 * entry_mult,
+    alpha=alpha,
+    r=r,
+    return_equity_cf=True
+)
+
     if return_all:
         return {
             "R": R,
+            'C': C,
+            'Y': Y,
             "mus": mus,
             "sigmas": sigmas,
             "etas": etas,
             "dW": dW,
             "dt": dt,
+            'D': D, 
+            'I': I,
+            'P': P,
+            'defaulted': defaulted,
+            'CF': eq_cf,
+            'r': r
         }
 
-    return R
+    return eq_cf
 
-def sim_PL(R, F, theta):
-    C = F + theta * R
-    Y = R - C
-    return C, Y
+
+

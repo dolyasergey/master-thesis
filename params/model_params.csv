@@ -11,3 +11,9 @@ R_0,356
 rho12,0
 rho13,0
 rho23,0
+F_0,100
+theta,0.6
+r0,0.06
+xi,0.5
+theta_r,0.04 
+omega,0.1
