@@ -90,12 +90,10 @@ def sim_cir(n_steps, dt, r0, xi, theta_r, omega, dW_r):
 def sim_LBO(Y, V0, alpha, r, return_equity_cf = True):
     n_paths, n_steps = Y.shape
 
-    # allow scalar r or array r
     if np.isscalar(r):
         r_mat = np.full((n_paths, n_steps), float(r))
     else:
         r_mat = np.asarray(r, dtype=float)
-        # if user provides (n_paths, n_steps-1), pad last column
         if r_mat.shape == (n_paths, n_steps - 1):
             r_mat = np.concatenate([r_mat, r_mat[:, -1][:, None]], axis=1)
 
@@ -108,7 +106,7 @@ def sim_LBO(Y, V0, alpha, r, return_equity_cf = True):
     D0 = alpha * V0
     D[:, 0] = D0
 
-    # Track "alive" paths
+    # Track alive paths
     alive = np.ones(n_paths, dtype=bool)
 
     for t in range(n_steps):
@@ -118,7 +116,7 @@ def sim_LBO(Y, V0, alpha, r, return_equity_cf = True):
         interest_due = r_mat[:, t] * D_prev
         cash = Y[:, t]
 
-        # default condition (only for alive paths)
+        # default condition
         will_default = alive & (cash < interest_due)
 
         if np.any(will_default):
@@ -134,7 +132,7 @@ def sim_LBO(Y, V0, alpha, r, return_equity_cf = True):
         # remaining cash after interest
         rem = cash[alive_idx] - interest_due[alive_idx]
 
-        # principal paid is min(remaining, outstanding debt)
+        # principal
         P_pay = np.minimum(D_prev[alive_idx], rem)
         P[alive_idx, t] = P_pay
 
