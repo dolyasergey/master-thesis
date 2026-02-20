@@ -1,120 +1,77 @@
-#imports 
 import numpy as np
 import pandas as pd
 
 from helper import rho_matrix_construct
-from sim import *
+from sim import sim_dW, sim_mu, sim_revenue, sim_PL, sim_firm_value, sim_cir, sim_LBO
 
-def run_sim(params, n_steps, n_paths, T, alpha, entry_mult, seed=99, stochastic_ir = False, return_all = False):
-    # --- read scalar params
+def run_sim(params, n_steps, n_paths, T, alpha, seed=99, stochastic_ir=False, return_all=False):
     dt = T / n_steps
 
-    # --- correlation matrix (3 factors by convention)
-    if "rhos" in params:
-        rhos = np.array(params["rhos"], dtype=float)
-    else:
-        rhos = np.array([float(params["rho12"]), float(params["rho13"]), float(params["rho23"])], dtype=float)
+    rho12    = float(params.get("rho12", 0.0))
+    corr     = rho_matrix_construct(3, np.array([rho12, 0.0, 0.0]))
+    dW       = sim_dW(n_paths=n_paths, n_steps=n_steps, dt=dt, corr=corr, seed=seed)
+    dW_R     = dW[:, :, 0]
+    dW_mu    = dW[:, :, 1]
+    dW_r     = dW[:, :, 2]
 
-    corr = rho_matrix_construct(3, rhos)
+    sigma    = float(params["sigma"])
+    eta      = float(params["eta"])
+    tau      = float(params["tau"])
+    rho      = float(params["rho"])
+    mu_hat   = float(params["mu_hat"])    # mean-reversion target for growth SDE
+    mu_tv    = float(params["mu_tv"])     # terminal value perpetuity growth rate
 
-    # --- correlated Brownian increments
-    dW = sim_dW(n_paths=n_paths, n_steps=n_steps, dt=dt, corr=corr, seed=seed)
-    dW_R = dW[:, :, 0]
-    dW_mu = dW[:, :, 1]
-    dW_r = dW[:, :, 2]  # rfor interest rates
-
-    # --- deterministic sigma and eta (tiled to paths)
-    sigmas = sim_sigma(
-        n_steps=n_steps,
-        dt=dt,
-        sigma_0=float(params["sigma_0"]),
-        kappa_1=float(params["kappa_1"]),
-        sigma_hat=float(params["sigma_hat"]),
-        n_paths=n_paths,
-    )
-
-    etas = sim_eta(
-        n_steps=n_steps,
-        dt=dt,
-        eta_0=float(params["eta_0"]),
-        kappa_2=float(params["kappa_2"]),
-        eta_hat=float(params.get("eta_hat", 0.0)),  # default zero-reverting
-        n_paths=n_paths,
-    )
-
-    # --- mu and revenue paths
     mus = sim_mu(
-        n_steps=n_steps,
-        dt=dt,
+        n_steps=n_steps, dt=dt,
         mu_0=float(params["mu_0"]),
-        mu_hat=float(params["mu_hat"]),
+        mu_hat=mu_hat,
         kappa_mu=float(params["kappa_mu"]),
-        etas=etas,
+        eta=eta,
         dW_mu=dW_mu,
     )
 
     R = sim_revenue(
-        n_steps=n_steps,
-        dt=dt,
+        n_steps=n_steps, dt=dt,
         R_0=float(params["R_0"]),
         mus=mus,
-        sigmas=sigmas,
+        sigma=sigma,
         dW_R=dW_R,
     )
 
-    #costs
-
-    C, Y = sim_PL(
-        R=R,
-        F=float(params["F_0"]),
-        theta=float(params["theta"])
-    )
-
-    # interest rates
+    C, Y = sim_PL(R=R, F=float(params["F_0"]), theta=float(params["theta"]), tau=tau)
 
     if stochastic_ir:
         r = sim_cir(
-            n_steps=n_steps, 
-            dt=dt, 
-            r0=params['r0'], 
-            xi=params['xi'], 
-            theta_r=params['theta_r'], 
-            omega=params['omega'], 
-            dW_r=dW_r)
+            n_steps=n_steps, dt=dt,
+            r0=float(params["r0"]),
+            xi=float(params["xi"]),
+            theta_r=float(params["theta_r"]),
+            omega=float(params["omega"]),
+            dW_r=dW_r,
+        )
     else:
-        r = 0.06
+        r = float(params.get("r_bar", 0.06))
 
+    # Firm value under model: entry at t=0, exit terminal value at t=T
+    V = sim_firm_value(Y=Y, dt=dt, rho=rho, mu_tv=mu_tv)
+    V_entry = V[:, 0]         # model-implied value at entry, per path
+    V_exit  = V[:, -1]        # Gordon-Shapiro terminal value at exit, per path
 
-    #LBO
-
-    EBITDA_0 = params['R_0'] * (1 - params['theta']) - params['F_0']
     D, I, P, defaulted, eq_cf = sim_LBO(
-    Y=Y,
-    V0=EBITDA_0 * entry_mult,
-    alpha=alpha,
-    r=r,
-    return_equity_cf=True
-)
+        Y=Y,
+        V_entry=V_entry,
+        V_exit=V_exit,
+        alpha=alpha,
+        r=r,
+        return_equity_cf=True,
+    )
 
     if return_all:
         return {
-            "R": R,
-            'C': C,
-            'Y': Y,
-            "mus": mus,
-            "sigmas": sigmas,
-            "etas": etas,
-            "dW": dW,
-            "dt": dt,
-            'D': D, 
-            'I': I,
-            'P': P,
-            'defaulted': defaulted,
-            'CF': eq_cf,
-            'r': r
+            "R": R, "C": C, "Y": Y, "mus": mus,
+            "sigma": sigma, "eta": eta, "dW": dW, "dt": dt,
+            "V": V, "V_entry": V_entry, "V_exit": V_exit,
+            "D": D, "I": I, "P": P, "defaulted": defaulted, "CF": eq_cf, "r": r,
         }
 
     return eq_cf
-
-
-
