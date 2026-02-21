@@ -18,8 +18,8 @@ def run_sim(params, n_steps, n_paths, T, alpha, seed=99, stochastic_ir=False, re
     eta      = float(params["eta"])
     tau      = float(params["tau"])
     rho      = float(params["rho"])
-    mu_hat   = float(params["mu_hat"])    # mean-reversion target for growth SDE
-    mu_tv    = float(params["mu_tv"])     # terminal value perpetuity growth rate
+    mu_hat   = float(params["mu_hat"])   
+    mu_tv    = float(params["mu_tv"])    
 
     mus = sim_mu(
         n_steps=n_steps, dt=dt,
@@ -52,11 +52,9 @@ def run_sim(params, n_steps, n_paths, T, alpha, seed=99, stochastic_ir=False, re
     else:
         r = float(params.get("r_bar", 0.06))
 
-    # Firm value under model: entry at t=0, exit terminal value at t=T
     V = sim_firm_value(Y=Y, dt=dt, rho=rho, mu_tv=mu_tv)
-    V_entry = V[:, 0]         # model-implied value at entry, per path
-    V_exit  = V[:, -1]        # Gordon-Shapiro terminal value at exit, per path
-
+    V_entry = V[:, 0]         
+    V_exit  = V[:, -1]        
     D, I, P, defaulted, eq_cf = sim_LBO(
         Y=Y,
         V_entry=V_entry,
