@@ -28,8 +28,8 @@ def sim_revenue(n_steps, dt, R_0, mus, sigma, dW_R):
         R[:, idx] = R_m * (1.0 + mus[:, idx - 1] * dt + sigma * dW_R[:, idx - 1])
     return R
 
-def sim_PL(R, F, theta, tau):
-    C = F + theta * R
+def sim_PL(R, F, theta, gamma, tau):
+    C = F + (theta + gamma) * R
     Y = (R - C) * (1.0 - tau)
     return C, Y
 
@@ -97,7 +97,6 @@ def sim_LBO(Y, V_entry, V_exit, alpha, r, return_equity_cf=True):
             D[:, t + 1] = D_prev
             D[alive_idx, t + 1] = D_prev[alive_idx] - P_pay
 
-    # At exit: surviving paths receive (V_exit - remaining debt), floored at 0
     if return_equity_cf:
         T_idx = n_steps - 1
         equity_cf[alive, T_idx] += np.maximum(V_exit[alive] - D[alive, T_idx], 0.0)

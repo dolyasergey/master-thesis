@@ -38,7 +38,7 @@ def run_sim(params, n_steps, n_paths, T, alpha, seed=99, stochastic_ir=False, re
         dW_R=dW_R,
     )
 
-    C, Y = sim_PL(R=R, F=float(params["F_0"]), theta=float(params["theta"]), tau=tau)
+    C, Y = sim_PL(R=R, F=float(params["F_0"]), theta=float(params["theta"]), gamma=float(params["gamma"]), tau=tau)
 
     if stochastic_ir:
         r = sim_cir(
