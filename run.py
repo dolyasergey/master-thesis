@@ -4,8 +4,9 @@ import pandas as pd
 from helper import rho_matrix_construct
 from sim import sim_dW, sim_mu, sim_revenue, sim_PL, sim_firm_value, sim_cir, sim_LBO
 
-def run_sim(params, n_steps, n_paths, T, alpha, seed=99, stochastic_ir=False, return_all=False):
+def run_sim(params, n_steps, n_paths, T, alpha, t_exit, seed=99, stochastic_ir=False, return_all=False):
     dt = T / n_steps
+    n_exit = min(int(t_exit / dt), n_steps - 1)
 
     rho12    = float(params.get("rho12", 0.0))
     corr     = rho_matrix_construct(3, np.array([rho12, 0.0, 0.0]))
@@ -53,14 +54,15 @@ def run_sim(params, n_steps, n_paths, T, alpha, seed=99, stochastic_ir=False, re
         r = float(params.get("r_bar", 0.06))
 
     V = sim_firm_value(Y=Y, dt=dt, rho=rho, mu_tv=mu_tv)
-    V_entry = V[:, 0]         
-    V_exit  = V[:, -1]        
+    V_entry = float(V[:, 0].mean())         
+    V_exit  = V[:, n_exit]      
     D, I, P, defaulted, eq_cf = sim_LBO(
-        Y=Y,
+        Y=Y[:, :n_exit+1],
+        dt=dt,
         V_entry=V_entry,
         V_exit=V_exit,
         alpha=alpha,
-        r=r,
+        r=r[:, :n_exit+1] if not np.isscalar(r) else r,
         return_equity_cf=True,
     )
 

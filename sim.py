@@ -59,7 +59,7 @@ def sim_cir(n_steps, dt, r0, xi, theta_r, omega, dW_r):
         r[:, t] = r_prev + xi * (theta_r - r_pos) * dt + omega * np.sqrt(r_pos) * dW_r[:, t - 1]
     return np.maximum(r, 0.0)
 
-def sim_LBO(Y, V_entry, V_exit, alpha, r, return_equity_cf=True):
+def sim_LBO(Y, dt, V_entry, V_exit, alpha, r, return_equity_cf=True):
     n_paths, n_steps = Y.shape
 
     if np.isscalar(r):
@@ -80,8 +80,8 @@ def sim_LBO(Y, V_entry, V_exit, alpha, r, return_equity_cf=True):
 
     for t in range(n_steps):
         D_prev = D[:, t]
-        interest_due = r_mat[:, t] * D_prev
-        cash = Y[:, t]
+        interest_due = r_mat[:, t] * D_prev * dt
+        cash = Y[:, t] * dt
         will_default = alive & (cash < interest_due)
         if np.any(will_default):
             defaulted[will_default, t:] = True
